@@ -1,0 +1,26 @@
+WITH t as(
+SELECT vis.user_id, 
+       date(event_dt) AS event_dt, 
+       min(date_start::date) OVER my_window AS date_start, 
+       date(event_dt)-min(date_start::date) OVER my_window AS diff,
+       EXTRACT ('week' FROM min(date_start::date) OVER my_window) AS week
+FROM orders_info_short ois 
+JOIN visits_info_short vis ON ois.user_id=vis.user_id 
+WINDOW my_window AS (PARTITION BY vis.user_id ORDER BY date_start)
+),
+t2 as(
+SELECT week, diff, count(DISTINCT user_id) AS cnt
+FROM t 
+WHERE diff IN (0, 1, 3, 7, 14, 21, 30)
+GROUP BY week, diff
+)
+SELECT week,
+       max(CASE WHEN diff = 0 THEN cnt END) AS day_0,
+       max(CASE WHEN diff=1 THEN cnt END) AS day_1,
+       max(CASE WHEN diff=3 THEN cnt END) AS day_3,
+       max(CASE WHEN diff=7 THEN cnt END) AS day_7,
+       max(CASE WHEN diff=14 THEN cnt END) AS day_14,
+       max(CASE WHEN diff=21 THEN cnt END) AS day_21,
+       max(CASE WHEN diff=30 THEN cnt END) AS day_30
+FROM t2 
+GROUP BY week 
