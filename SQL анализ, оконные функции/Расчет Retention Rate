@@ -3,23 +3,23 @@
 Таблица visits_info_short: где поле user_id - это идентификатор пользователя(внешний ключ к таблице orders_info_short), поле date_start - дата посещения, включая дату первого посещения, то есть регистрации
 Задача: разбить пользователей на когорты по неделям и рассчитать их удержание(Retention Rate) в 0, 1, 3, 7, 14, 21, 30 дни 2019 года
 
-WITH t as( -- оборачиваем весь запрос во временную таблицу
+WITH t as(             -- оборачиваем весь запрос во временную таблицу
 SELECT vis.user_id, 
-       date(event_dt) AS event_dt, -- преобразовываем поле в тип дата 
-       min(date_start::date) OVER my_window AS date_start, -- создаем поле с датой регистрации
-       date(event_dt)-min(date_start::date) OVER my_window AS diff, -- считаем разницу в днях от даты покупок до даты регистрации пользователей
-       EXTRACT ('week' FROM min(date_start::date) OVER my_window) AS week -- создаем поле c номером недели для формирования когорт
+       date(event_dt) AS event_dt,             -- преобразовываем поле в тип дата 
+       min(date_start::date) OVER my_window AS date_start,              -- создаем поле с датой регистрации
+       date(event_dt)-min(date_start::date) OVER my_window AS diff,              -- считаем разницу в днях от даты покупок до даты регистрации пользователей
+       EXTRACT ('week' FROM min(date_start::date) OVER my_window) AS week              -- создаем поле c номером недели для формирования когорт
 FROM orders_info_short ois 
 JOIN visits_info_short vis ON ois.user_id=vis.user_id -- объединяем таблицу orders_info_short и visits_info_short по полю user_id
-WINDOW my_window AS (PARTITION BY vis.user_id ORDER BY date_start) -- создаем оконную для того чтобы нам вернуть только дату первого посещения, то есть дату регистрации по каждому user_id
+WINDOW my_window AS (PARTITION BY vis.user_id ORDER BY date_start)             -- создаем оконную для того чтобы нам вернуть только дату первого посещения, то есть дату регистрации по каждому user_id
 ),
 t2 as( -- оборачиваем во вторую временную таблицу 
-SELECT week, diff, count(DISTINCT user_id) AS cnt -- агрегируем и считаем количество уникальных пользователей по когорте и дням активности
+SELECT week, diff, count(DISTINCT user_id) AS cnt               -- агрегируем и считаем количество уникальных пользователей по когорте и дням активности
 FROM t 
-WHERE diff IN (0, 1, 3, 7, 14, 21, 30) -- фильтруем данные только по тем дням для которых мы решили рассчитать Retention Rate
-GROUP BY week, diff -- группируем по когорте и количеству дней от даты регистрации до даты покупок
+WHERE diff IN (0, 1, 3, 7, 14, 21, 30)             -- фильтруем данные только по тем дням для которых мы решили рассчитать Retention Rate
+GROUP BY week, diff             -- группируем по когорте и количеству дней от даты регистрации до даты покупок
 )
-SELECT week, -- преобразуем длинную таблицу в широкую посредством CASE, даем полям названия дней удержания
+SELECT week,               -- преобразуем длинную таблицу в широкую посредством CASE, даем полям названия дней удержания
        max(CASE WHEN diff = 0 THEN cnt END) AS day_0,
        max(CASE WHEN diff=1 THEN cnt END) AS day_1,
        max(CASE WHEN diff=3 THEN cnt END) AS day_3,
